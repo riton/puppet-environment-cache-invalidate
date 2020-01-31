@@ -1,0 +1,66 @@
+---
+name: 'ci-build'
+
+on:
+  - 'push'
+
+jobs:
+  build:
+    name: 'Build go binary'
+    runs-on: 'ubuntu-latest'
+    env:
+      CGO_ENABLED: '0'
+      GOOS: 'linux'
+      GOFLAGS: '-mod=vendor'
+
+    steps:
+      - name: 'Checkout code'
+        uses: 'actions/checkout@master'
+
+      - name: 'Install go'
+        uses: 'actions/setup-go@master'
+        with:
+          go-version: '1.13.4'
+
+      - name: 'Test code'
+        run: 'go test -v ./...'
+
+      - name: 'Build plugin'
+        run: go build -a -ldflags "-extldflags '-static'" -o puppet-environment-cache-invalidate
+
+      - name: 'Upload artifact'
+        uses: 'actions/upload-artifact@master'
+        with:
+          name: 'puppet-environment-cache-invalidate-binary'
+          path: 'puppet-environment-cache-invalidate'
+
+  rpm_package:
+    name: 'Build an RPM of the go-binary'
+    needs: 'build'
+    runs-on: 'ubuntu-latest'
+    container:
+      image: 'remiferrand/fpm'
+
+    steps:
+      - name: 'Download artifact from previous job'
+        uses: 'actions/download-artifact@master'
+        with:
+          name: 'puppet-environment-cache-invalidate-binary'
+          path: 'puppet-environment-cache-invalidate-binary'
+
+      - name: 'Prepare FPM directories'
+        run: |
+          mkdir -p ./usr/bin ./pkg && \
+          mv puppet-environment-cache-invalidate-binary/puppet-environment-cache-invalidate ./usr/bin/ && \
+          chmod 0755 ./usr/bin/puppet-environment-cache-invalidate
+
+        # For the reason of '--rpm-rpmbuild-define "_build_id_links none"'
+        # see https://github.com/jordansissel/fpm/issues/1503#issuecomment-404849150
+      - name: 'Package artifact into an RPM'
+        run: 'fpm -s dir -t rpm -p ./pkg/ --license "CECILL-B" --no-rpm-autoreqprov -n "puppet-environment-cache-invalidate" -v "v0.1.0-${GITHUB_SHA}" --url "https://github.com/riton/puppet-environment-cache-invalidate" --description "CLI that invalidates Puppet environment cache on multiple Puppet servers" --maintainer "Remi Ferrand <remi.ferrand@cc.in2p3.fr>" --rpm-rpmbuild-define "_build_id_links none" ./usr'
+
+      - name: 'Upload artifact'
+        uses: 'actions/upload-artifact@master'
+        with:
+          name: 'puppet-environment-cache-invalidate-rpm'
+          path: 'pkg'
