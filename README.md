@@ -27,6 +27,24 @@ Flags:
       --log-syslog      log to syslog
 ```
 
+## Installation
+
+### Build from source
+
+```
+$ go build .
+```
+
+### Pre-compiled binaries
+
+This project is investigating _Github actions_ to build its packages.
+
+You can find:
+* pre-compiled binary for Linux
+* pre-built RPM package
+
+in [the action tab of this project](https://github.com/riton/puppet-environment-cache-invalidate/actions)
+
 ## Configuration
 
 Configuration file is searched for in the following places:
